@@ -1,78 +1,207 @@
-[![Open in Visual Studio Code](https://classroom.github.com/assets/open-in-vscode-2e0aaae1b6195c2367325f4f02e2d04e9abb55f0b24a779b69b11b9e10269abc.svg)](https://classroom.github.com/online_ide?assignment_repo_id=19936530&assignment_repo_type=AssignmentRepo)
-# Deployment and DevOps for MERN Applications
+**Here's a complete **production-ready MERN stack implementation** with deployment and DevOps configurations:
 
-This assignment focuses on deploying a full MERN stack application to production, implementing CI/CD pipelines, and setting up monitoring for your application.
+```bash
+# PROJECT STRUCTURE
+mern-deployment/
+├── client/                  # React Frontend
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── pages/           # Page components
+│   │   ├── App.js           # Main app
+│   │   └── index.js         # Entry point
+│   ├── .env.example         # Frontend env template
+│   └── package.json
+├── server/                  # Express Backend
+│   ├── config/
+│   │   └── db.js            # MongoDB connection
+│   ├── controllers/         # Route controllers
+│   ├── models/              # Mongoose models
+│   ├── routes/              # API routes
+│   ├── middleware/          # Auth & error handlers
+│   ├── .env.example         # Backend env template
+│   └── server.js           # Entry point
+├── .github/workflows/       # CI/CD Pipelines
+│   ├── frontend-ci.yml
+│   ├── backend-ci.yml
+│   ├── frontend-cd.yml
+│   └── backend-cd.yml
+├── deployment/              # Deployment configs
+│   ├── vercel.json          # Frontend config
+│   └── render.yaml          # Backend config
+├── monitoring/              # Monitoring setup
+│   ├── sentry.js            # Error tracking
+│   └── healthcheck.js       # Endpoint config
+└── README.md                # Deployment docs
+```
 
-## Assignment Overview
+### **1. Backend (Express.js + MongoDB)**
+`server/server.js`:
+```javascript
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const cors = require('cors');
 
-You will:
-1. Prepare your MERN application for production deployment
-2. Deploy the backend to a cloud platform
-3. Deploy the frontend to a static hosting service
-4. Set up CI/CD pipelines with GitHub Actions
-5. Implement monitoring and maintenance strategies
+// DB Connection
+mongoose.connect(process.env.MONGO_URI, {
+  maxPoolSize: 50,
+  socketTimeoutMS: 5000
+});
 
-## Getting Started
+// Express App
+const app = express();
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(morgan('combined'));
 
-1. Accept the GitHub Classroom assignment invitation
-2. Clone your personal repository that was created by GitHub Classroom
-3. Follow the setup instructions in the `Week7-Assignment.md` file
-4. Use the provided templates and configuration files as a starting point
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/users', require('./routes/users'));
 
-## Files Included
+// Health Check
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    uptime: process.uptime() 
+  });
+});
 
-- `Week7-Assignment.md`: Detailed assignment instructions
-- `.github/workflows/`: GitHub Actions workflow templates
-- `deployment/`: Deployment configuration files and scripts
-- `.env.example`: Example environment variable templates
-- `monitoring/`: Monitoring configuration examples
+// Error Handling
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
 
-## Requirements
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+```
 
-- A completed MERN stack application from previous weeks
-- Accounts on the following services:
-  - GitHub
-  - MongoDB Atlas
-  - Render, Railway, or Heroku (for backend)
-  - Vercel, Netlify, or GitHub Pages (for frontend)
-- Basic understanding of CI/CD concepts
+### **2. Frontend (React)**
+`client/src/App.js`:
+```javascript
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
 
-## Deployment Platforms
+Sentry.init({
+  dsn: process.env.REACT_APP_SENTRY_DSN,
+  environment: process.env.NODE_ENV
+});
 
-### Backend Deployment Options
-- **Render**: Easy to use, free tier available
-- **Railway**: Developer-friendly, generous free tier
-- **Heroku**: Well-established, extensive documentation
+const Home = lazy(() => import('./pages/Home'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 
-### Frontend Deployment Options
-- **Vercel**: Optimized for React apps, easy integration
-- **Netlify**: Great for static sites, good CI/CD
-- **GitHub Pages**: Free, integrated with GitHub
+function App() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
 
-## CI/CD Pipeline
+export default App;
+```
 
-The assignment includes templates for setting up GitHub Actions workflows:
-- `frontend-ci.yml`: Tests and builds the React application
-- `backend-ci.yml`: Tests the Express.js backend
-- `frontend-cd.yml`: Deploys the frontend to your chosen platform
-- `backend-cd.yml`: Deploys the backend to your chosen platform
+### **3. CI/CD Pipelines**
+`.github/workflows/backend-cd.yml`:
+```yaml
+name: Backend CD
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: render-actions/deploy@v1
+        with:
+          api_key: ${{ secrets.RENDER_API_KEY }}
+          service_id: ${{ secrets.RENDER_SERVICE_ID }}
+```
 
-## Submission
+### **4. Deployment Configs**
+`deployment/vercel.json`:
+```json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "build" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "client/build/index.html"
+    }
+  ]
+}
+```
 
-Your work will be automatically submitted when you push to your GitHub Classroom repository. Make sure to:
+### **5. Environment Templates**
+`server/.env.example`:
+```ini
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/dbname
+PORT=5000
+JWT_SECRET=your_jwt_secret
+SENTRY_DSN=https://example@sentry.io/123
+```
 
-1. Complete all deployment tasks
-2. Set up CI/CD pipelines with GitHub Actions
-3. Deploy both frontend and backend to production
-4. Document your deployment process in the README.md
-5. Include screenshots of your CI/CD pipeline in action
-6. Add URLs to your deployed applications
+### **6. Monitoring Setup**
+`monitoring/sentry.js`:
+```javascript
+const Sentry = require('@sentry/node');
 
-## Resources
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  integrations: [
+    new Sentry.Integrations.Http({ tracing: true })
+  ]
+});
+```
 
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [MongoDB Atlas Documentation](https://docs.atlas.mongodb.com/)
-- [Render Documentation](https://render.com/docs)
-- [Railway Documentation](https://docs.railway.app/)
-- [Vercel Documentation](https://vercel.com/docs)
-- [Netlify Documentation](https://docs.netlify.com/) 
+### **Key Features Implemented:**
+1. **Production Optimization**
+   - Code splitting with React.lazy()
+   - Helmet security headers
+   - MongoDB connection pooling
+
+2. **DevOps Ready**
+   - GitHub Actions for CI/CD
+   - Health check endpoints
+   - Sentry error tracking
+
+3. **Deployment Configs**
+   - Vercel for frontend
+   - Render for backend
+   - Environment variable management
+
+4. **Monitoring**
+   - Uptime checks
+   - Performance tracking
+   - Error logging
+
+To deploy:
+```bash
+# Backend (Render)
+cd server
+render deploy
+
+# Frontend (Vercel)
+cd client
+vercel --prod
+```
